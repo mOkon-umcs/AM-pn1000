@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,7 +44,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.jar.Manifest
 
 class MainActivity : ComponentActivity() {
@@ -72,6 +79,10 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 
+    private lateinit var repository: StepRepository
+    private var steps by mutableStateOf(0)
+
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -79,9 +90,14 @@ class MainActivity : ComponentActivity() {
 
         StepsNotifications.createChannel(this)
 
+        repository = StepRepository.get(this)
+
+        lifecycleScope.launch {
+            steps = repository.todaySteps()
+        }
+
         enableEdgeToEdge()
         setContent {
-            var steps by rememberSaveable { mutableStateOf(0) }
             MyApplicationTheme {
                 Column {
                     ProfileCard("Jan", "Student")
@@ -104,6 +120,9 @@ class MainActivity : ComponentActivity() {
                         Row {
                             Button(onClick = {
                                 steps++
+                                lifecycleScope.launch {
+                                    repository.saveToday(steps)
+                                }
                                 if(steps == StepsNotifications.GOAL){
                                     StepsNotifications.showGoalReached(this@MainActivity)
                                 }
@@ -143,6 +162,27 @@ class MainActivity : ComponentActivity() {
                         Button(onClick = {
                             StepService.stop(this@MainActivity)
                         }) {Text("Zatrzymaj krokomierz") }
+//
+//                        Button(
+//                            onClick = {
+//                                Thread.sleep(5000)
+//                                steps += 100
+//                            }
+//                        )
+//                        {
+//                            Text("Dodaj 100 kroków (źle)")
+//                        }
+//
+//                        Button(onClick = {
+//                            lifecycleScope.launch {
+//                                val bonus = withContext(Dispatchers.Default) {
+//                                    Thread.sleep(5000)
+//                                    100
+//                                }
+//                                steps += bonus
+//                            }
+//                        })
+//                        { Text("Dodaj 100 kroków (dobrze)") }
 
                         Spacer(Modifier.height(16.dp))
                         Text(
